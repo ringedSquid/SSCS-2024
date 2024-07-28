@@ -77,14 +77,18 @@ void sleep() {
   analogWrite(DAC_OUT, 0);
   //Disable ADC
   ADC0.CTRLA &= ~ADC_ENABLE_bm;
-  PORTA.
+  //Interrupt on rising
+  PORTA.PIN3CTRL = 0b00000010;
   sleep_cpu();
 }
 
-ISR() {
+ISR(PORTA_PORT_vect) {
+  //Clear flags
+  PORTA.INTFLAGS = 1;
+  //Disable interrupt
+  PORTA.PIN3CTRL &= ~(0b00000111);
   //enable ADC
   ADC0.CTRLA |= ADC_ENABLE_bm;
-  
 }
 
 double getMoistureLevel(double x) {
