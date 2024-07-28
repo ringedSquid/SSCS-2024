@@ -6,11 +6,11 @@
 #define CHARGE PIN_PA7
 #define ADC_IN PIN_PA4
 
-#define PTN_IN PIN_PA3
+#define PTN_IN PIN_PA2
 #define RED_LED PIN_PB1
 #define GRN_LED PIN_PB0
 
-#define AVERAGE_RES 10
+#define AVERAGE_RES 5
 
 //Coefficients for linear model
 #define M 117.1875014
@@ -38,9 +38,9 @@ void setup() {
   pinMode(DISCHARGE, OUTPUT);
 
   //init other pins
-  pinMode(PIN_PB3, OUTPUT);
-  pinMode(PIN_PB2, OUTPUT);
-  pinMode(PIN_PA2, OUTPUT);
+  //pinMode(PIN_PB3, OUTPUT);
+  //pinMode(PIN_PB2, OUTPUT);
+  pinMode(PIN_PA3, OUTPUT);
   pinMode(PIN_PA1, OUTPUT);
   pinMode(PIN_PA0, OUTPUT);
 
@@ -78,15 +78,17 @@ void sleep() {
   //Disable ADC
   ADC0.CTRLA &= ~ADC_ENABLE_bm;
   //Interrupt on rising
-  PORTA.PIN3CTRL = 0b00000010;
+  PORTA.PIN2CTRL |= 0x02;
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  sleep_enable();
   sleep_cpu();
 }
 
 ISR(PORTA_PORT_vect) {
   //Clear flags
-  PORTA.INTFLAGS = 1;
+  PORTA.INTFLAGS = 255;
   //Disable interrupt
-  PORTA.PIN3CTRL &= ~(0b00000111);
+  PORTA.PIN2CTRL &= ~(0b00000111);
   //enable ADC
   ADC0.CTRLA |= ADC_ENABLE_bm;
 }
@@ -113,7 +115,7 @@ double getRiseTime() {
     while (readADC() < 637) {
     }
 
-    long delta_t = micros - t0;
+    long delta_t = micros() - t0;
     tSum += delta_t;
   }
   return (tSum / AVERAGE_RES) * pow(10, -6);
