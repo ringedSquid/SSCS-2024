@@ -10,22 +10,29 @@
 #define RED_LED PIN_PB1
 #define GRN_LED PIN_PB0
 
-#define AVERAGE_RES 5
+#define AVERAGE_RES 20
 
 //Coefficients for linear model
-#define M 117.1875014
-#define B -101.9550907
+#define DRY 620.0
+#define WET 30.0
 
 //user defined moisture ranges (acceptable range)
-#define RL 0.6
+#define RL 0.3
 #define RH 0.7
+
+double M = 0;
+double B = 0;
 
 void setup() {
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   sleep_enable();
 
+  Serial.begin(57600);
   DACReference(INTERNAL1V5);
-  analogReference(INTERNAL2V5);
+  analogReference(INTERNAL1V5);
+
+  M = 1/(WET-DRY);
+  B = -DRY*M;
 
   //init used pin modes
   pinMode(ADC_IN, INPUT);
@@ -38,8 +45,8 @@ void setup() {
   pinMode(DISCHARGE, OUTPUT);
 
   //init other pins
-  //pinMode(PIN_PB3, OUTPUT);
-  //pinMode(PIN_PB2, OUTPUT);
+  pinMode(PIN_PB3, OUTPUT);
+  pinMode(PIN_PB2, OUTPUT);
   pinMode(PIN_PA3, OUTPUT);
   pinMode(PIN_PA1, OUTPUT);
   pinMode(PIN_PA0, OUTPUT);
@@ -54,11 +61,13 @@ void setup() {
 }
 
 void loop() {
-  double moistureLevel = getMoistureLevel(getRiseTime());
-  if (moistureLevel <= 0.6) {
+  double moistureLevel = getMoistureLevel(getRawData());
+  //Serial.println(moistureLevel, 8);
+  //Serial.println(M, 8);
+  if (moistureLevel <= RL) {
     digitalWrite(RED_LED, HIGH);
   }
-  else if (moistureLevel >= 0.6) {
+  else if (moistureLevel >= RH) {
     digitalWrite(GRN_LED, HIGH);
     digitalWrite(RED_LED, HIGH);
   }
@@ -70,15 +79,15 @@ void loop() {
 }
 
 void sleep() {
-  digitalWrite(DISCHARGE, LOW);
+  digitalWrite(DISCHARGE, HIGH);
   digitalWrite(CHARGE, LOW);
   digitalWrite(GRN_LED, LOW);
   digitalWrite(RED_LED, LOW);
-  analogWrite(DAC_OUT, 0);
+  analogWrite(DAC_OUT, 0);                                                                                                                                                                                                                                                                                                                                                                                                           
   //Disable ADC
   ADC0.CTRLA &= ~ADC_ENABLE_bm;
   //Interrupt on rising
-  PORTA.PIN2CTRL |= 0x02;
+  PORTA.PIN2CTRL = 0b00000010;
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
   sleep_enable();
   sleep_cpu();
@@ -97,34 +106,19 @@ double getMoistureLevel(double x) {
   return M * x + B;
 }
 
-double getRiseTime() {
-  double tSum = 0;
-  for (int i = 0; i < AVERAGE_RES; i++) {
-    digitalWrite(DISCHARGE, HIGH);
-    digitalWrite(CHARGE, LOW);
-    analogWrite(DAC_OUT, 255);
-
-    //Discharge cap
-    while (readADC() > 15) {
-    }
-
-    long t0 = micros();
-    digitalWrite(DISCHARGE, LOW);
-    digitalWrite(CHARGE, HIGH);
-
-    while (readADC() < 637) {
-    }
-
-    long delta_t = micros() - t0;
-    tSum += delta_t;
-  }
-  return (tSum / AVERAGE_RES) * pow(10, -6);
-}
-
-double readADC() {
+double getRawData() {
   double sum = 0;
-  for (int i = 0; i < 5; i++) {
-    sum += analogRead(ADC_IN);
+  analogWrite(DAC_OUT, 255);
+  delay(10);
+  for (int i = 0; i < AVERAGE_RES; i++) {
+     digitalWrite(CHARGE, HIGH);
+     digitalWrite(DISCHARGE, LOW);
+     int val = analogRead(ADC_IN);
+     digitalWrite(CHARGE, LOW);
+     digitalWrite(DISCHARGE, HIGH);
+     sum += val;
+     delay(10);     
   }
-  return sum / 5;
+  //Serial.println(sum/AVERAGE_RES);
+  return sum/AVERAGE_RES;   
 }
